@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CinemaOS Resolver</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 40px auto; max-width: 1000px; padding: 20px; background: #f9f9f9; }
+    h1 { color: #0066ff; }
+    input, select, button { padding: 12px; margin: 8px 4px; font-size: 16px; border-radius: 8px; border: 1px solid #ccc; }
+    button { background: #0066ff; color: white; border: none; cursor: pointer; font-weight: bold; }
+    button:hover { background: #0052cc; }
+    pre { background: #1e1e1e; color: #fff; padding: 16px; border-radius: 8px; overflow-x: auto; max-height: 60vh; }
+    .success { color: #00cc00; font-weight: bold; }
+    .error { color: #ff4444; }
+  </style>
+</head>
+<body>
+  <h1>🎬 CinemaOS Resolver</h1>
+  <p>Extract playable media links from CinemaOS player pages.</p>
+
+  <div>
+    <input type="text" id="url" placeholder="https://cinemaos.tech/player/254 or TMDB ID" style="width:65%;">
+    <button onclick="resolveUrl()">Resolve</button>
+  </div>
+
+  <div>
+    <select id="type">
+      <option value="movie">Movie</option>
+      <option value="tv">TV</option>
+    </select>
+    <input type="number" id="season" placeholder="Season" style="width:100px;">
+    <input type="number" id="episode" placeholder="Episode" style="width:100px;">
+  </div>
+
+  <div id="result" style="margin-top: 25px;"></div>
+
+  <script>
+    async function resolveUrl() {
+      const url = document.getElementById('url').value.trim();
+      if (!url) return alert("Please enter a URL or TMDB ID");
+
+      const type = document.getElementById('type').value;
+      const season = document.getElementById('season').value;
+      const episode = document.getElementById('episode').value;
+
+      const params = new URLSearchParams({ url, type });
+      if (season) params.append('season', season);
+      if (episode) params.append('episode', episode);
+
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = '<p>🔄 Resolving... Please wait.</p>';
+
+      try {
+        const res = await fetch(`/resolve?${params}`);
+        const data = await res.json();
+
+        let html = `<h2>Status: <span class="${data.status === 'resolved' ? 'success' : 'error'}">${data.status}</span></h2>`;
+
+        if (data.metadata?.title) {
+          html += `<p><strong>Title:</strong> ${data.metadata.title} ${data.metadata.year ? `(${data.metadata.year})` : ''}</p>`;
+        }
+
+        const mu = data.media_urls || {};
+        if (mu.m3u8?.length) html += `<h3>m3u8 Playlists</h3><pre>${mu.m3u8.join('\n')}</pre>`;
+        if (mu.mp4?.length) html += `<h3>MP4 Links</h3><pre>${mu.mp4.join('\n')}</pre>`;
+        if (mu.decoded_proxy_targets?.length) html += `<h3>Decoded Proxy Targets</h3><pre>${mu.decoded_proxy_targets.join('\n')}</pre>`;
+
+        html += `<details><summary>Full Response JSON</summary><pre>${JSON.stringify(data, null, 2)}</pre></details>`;
+        resultDiv.innerHTML = html;
+      } catch (err) {
+        resultDiv.innerHTML = `<p class="error">Failed to connect: ${err.message}</p>`;
+      }
+    }
+
+    document.getElementById('url').addEventListener('keypress', e => {
+      if (e.key === 'Enter') resolveUrl();
+    });
+  </script>
+</body>
+</html>
